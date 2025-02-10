@@ -24,7 +24,7 @@ services:
     build: .
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.game.rule=Host(`test.demirse.com`)"
+      - "traefik.http.routers.game.rule=Host(`tank.demirse.com`)"
       - "traefik.http.routers.game.entrypoints=websecure"
       - "traefik.http.routers.game.tls.certresolver=myresolver"
     networks:
