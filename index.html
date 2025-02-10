@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Phaser Tank Duel Game</title>
+  <title>Demir's Tank Game</title>
   <style>
     /* Remove default margins and center the canvas */
     body {
@@ -80,7 +80,8 @@
           speed: 3,
           color: 0x0000ff,   // Blue
           turretAngle: 0,    // Initially facing right (0 radians)
-          score: 0           // Add score property
+          score: 0,          // Add score property
+          hasBurstShot: false
         };
         this.tank1.hp = 6;
         this.tank1.lastShotTime = 0;
@@ -94,10 +95,28 @@
           speed: 3,
           color: 0xff0000,   // Red
           turretAngle: Math.PI,   // Initially facing left (π radians)
-          score: 0           // Add score property
+          score: 0,          // Add score property
+          hasBurstShot: false
         };
         this.tank2.hp = 6;
         this.tank2.lastShotTime = 0;
+
+        // Initialize power-up related properties
+        this.powerUps = [];
+        
+        // Attach spawnPowerUp function to this
+        this.spawnPowerUp = spawnPowerUp;
+        
+        // Set up power-up spawn timer and spawn first power-up
+        this.time.addEvent({
+          delay: 15000,  // 15 seconds
+          callback: this.spawnPowerUp,
+          callbackScope: this,
+          loop: true
+        });
+        
+        // Removed the immediate spawn to delay first spawn by 15 seconds
+        // this.spawnPowerUp();
 
         // Create score text displays
         this.scoreText1 = this.add.text(20, 20, 'Blue: 0', { fontSize: '32px', fill: '#0000FF', stroke: '#000000', strokeThickness: 4 });
@@ -114,6 +133,69 @@
 
         // Array to hold bullets
         this.bullets = [];
+      }
+
+      function spawnPowerUp() {
+        // Spawn power-up at random position
+        const x = Phaser.Math.Between(50, this.sys.game.config.width - 50);
+        const y = Phaser.Math.Between(50, this.sys.game.config.height - 50);
+        
+        this.powerUps.push({
+          x: x,
+          y: y,
+          width: 20,
+          height: 20,
+          type: 'burstShot'
+        });
+      }
+
+      function drawPowerUp(graphics, powerUp) {
+        const centerX = powerUp.x;
+        const centerY = powerUp.y;
+        const outerRadius = 10;
+        const innerRadius = 5;
+        const spikes = 5;
+        const step = Math.PI / spikes;
+        let rotation = Math.PI / 2 * 3;
+        const points = [];
+        
+        for (let i = 0; i < spikes; i++) {
+            let x1 = centerX + Math.cos(rotation) * outerRadius;
+            let y1 = centerY + Math.sin(rotation) * outerRadius;
+            points.push(new Phaser.Geom.Point(x1, y1));
+            rotation += step;
+            
+            let x2 = centerX + Math.cos(rotation) * innerRadius;
+            let y2 = centerY + Math.sin(rotation) * innerRadius;
+            points.push(new Phaser.Geom.Point(x2, y2));
+            rotation += step;
+        }
+        
+        graphics.fillStyle(0xffff00);
+        graphics.lineStyle(2, 0xffff00);
+        graphics.fillPoints(points, true);
+      }
+
+      function fireBurstShot(tank) {
+        const turretLength = 20;
+        const centerX = tank.x + tank.width / 2;
+        const centerY = tank.y + tank.height / 2;
+        const spreadAngle = Math.PI / 8; // 22.5 degrees spread
+        
+        for(let i = -2; i <= 2; i++) {
+          const angle = tank.turretAngle + (i * spreadAngle / 2);
+          const bx = centerX + turretLength * Math.cos(angle);
+          const by = centerY + turretLength * Math.sin(angle);
+          
+          this.bullets.push({
+            x: bx,
+            y: by,
+            speed: 5,
+            angle: angle,
+            owner: tank === this.tank1 ? 'tank1' : 'tank2',
+            bounce: 0
+          });
+        }
       }
 
       function update() {
@@ -194,19 +276,24 @@
         this.tank1.y = Phaser.Math.Clamp(this.tank1.y, 0, this.sys.game.config.height - this.tank1.height);
         // Handle shooting for Tank 1 with 500ms delay
         if (Phaser.Input.Keyboard.JustDown(this.keys1.shoot) && this.time.now - this.tank1.lastShotTime >= 500) {
-          const turretLength = 20;
-          const centerX = this.tank1.x + this.tank1.width / 2;
-          const centerY = this.tank1.y + this.tank1.height / 2;
-          const bx = centerX + turretLength * Math.cos(this.tank1.turretAngle);
-          const by = centerY + turretLength * Math.sin(this.tank1.turretAngle);
-          this.bullets.push({
-            x: bx,
-            y: by,
-            speed: 5,
-            angle: this.tank1.turretAngle,
-            owner: 'tank1',
-            bounce: 0  // initialize bounce counter
-          });
+          if (this.tank1.hasBurstShot) {
+            fireBurstShot.call(this, this.tank1);
+            this.tank1.hasBurstShot = false;
+          } else {
+            const turretLength = 20;
+            const centerX = this.tank1.x + this.tank1.width / 2;
+            const centerY = this.tank1.y + this.tank1.height / 2;
+            const bx = centerX + turretLength * Math.cos(this.tank1.turretAngle);
+            const by = centerY + turretLength * Math.sin(this.tank1.turretAngle);
+            this.bullets.push({
+              x: bx,
+              y: by,
+              speed: 5,
+              angle: this.tank1.turretAngle,
+              owner: 'tank1',
+              bounce: 0
+            });
+          }
           this.tank1.lastShotTime = this.time.now;
         }
 
@@ -237,19 +324,24 @@
         this.tank2.y = Phaser.Math.Clamp(this.tank2.y, 0, this.sys.game.config.height - this.tank2.height);
         // Handle shooting for Tank 2 with 500ms delay
         if (Phaser.Input.Keyboard.JustDown(this.keys2.shoot) && this.time.now - this.tank2.lastShotTime >= 500) {
-          const turretLength = 20;
-          const centerX = this.tank2.x + this.tank2.width / 2;
-          const centerY = this.tank2.y + this.tank2.height / 2;
-          const bx = centerX + turretLength * Math.cos(this.tank2.turretAngle);
-          const by = centerY + turretLength * Math.sin(this.tank2.turretAngle);
-          this.bullets.push({
-            x: bx,
-            y: by,
-            speed: 5,
-            angle: this.tank2.turretAngle,
-            owner: 'tank2',
-            bounce: 0  // initialize bounce counter
-          });
+          if (this.tank2.hasBurstShot) {
+            fireBurstShot.call(this, this.tank2);
+            this.tank2.hasBurstShot = false;
+          } else {
+            const turretLength = 20;
+            const centerX = this.tank2.x + this.tank2.width / 2;
+            const centerY = this.tank2.y + this.tank2.height / 2;
+            const bx = centerX + turretLength * Math.cos(this.tank2.turretAngle);
+            const by = centerY + turretLength * Math.sin(this.tank2.turretAngle);
+            this.bullets.push({
+              x: bx,
+              y: by,
+              speed: 5,
+              angle: this.tank2.turretAngle,
+              owner: 'tank2',
+              bounce: 0
+            });
+          }
           this.tank2.lastShotTime = this.time.now;
         }
 
@@ -380,6 +472,30 @@
         this.bullets.forEach(bullet => {
           this.graphics.fillCircle(bullet.x, bullet.y, 5);
         });
+
+        // Update and draw power-ups
+        // Remove this line since we already cleared graphics at the start of update
+        // this.graphics.clear();
+        
+        // Draw and check power-up collisions
+        for (let i = this.powerUps.length - 1; i >= 0; i--) {
+          const powerUp = this.powerUps[i];
+          drawPowerUp(this.graphics, powerUp);
+          
+          // Check collision with tanks
+          const checkTankCollision = (tank) => {
+            return Math.abs((tank.x + tank.width/2) - powerUp.x) < (tank.width/2 + powerUp.width/2) &&
+                   Math.abs((tank.y + tank.height/2) - powerUp.y) < (tank.height/2 + powerUp.height/2);
+          };
+          
+          if (checkTankCollision(this.tank1)) {
+            this.tank1.hasBurstShot = true;
+            this.powerUps.splice(i, 1);
+          } else if (checkTankCollision(this.tank2)) {
+            this.tank2.hasBurstShot = true;
+            this.powerUps.splice(i, 1);
+          }
+        }
       }
 
       // Helper function to draw a tank body and its turret.
