@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Phaser Tank Duel Game</title>
+  <style>
+    /* Remove default margins and center the canvas */
+    body {
+      margin: 0;
+      background: #121212;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+    }
+  </style>
+  <!-- Load Phaser 3 from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js"></script>
+  <script>
+    window.onload = function() {
+      const config = {
+        type: Phaser.AUTO,
+        width: 1920,       // Virtual width (16:9)
+        height: 1080,      // Virtual height
+        backgroundColor: "#222222",
+        scale: {
+          mode: Phaser.Scale.FIT,           // FIT mode scales the game for any 16:9 screen
+          autoCenter: Phaser.Scale.CENTER_BOTH
+        },
+        scene: {
+          preload: preload,
+          create: create,
+          update: update
+        }
+      };
+
+      const game = new Phaser.Game(config);
+
+      function preload() {
+        // No external assets are required; we're using graphics objects.
+      }
+
+      function create() {
+        // Create a graphics object for drawing our tanks and bullets.
+        this.graphics = this.add.graphics();
+
+        // Setup keyboard input for Tank 1 (controlled by WASD and F to shoot)
+        this.keys1 = this.input.keyboard.addKeys({
+          up: Phaser.Input.Keyboard.KeyCodes.W,
+          down: Phaser.Input.Keyboard.KeyCodes.S,
+          left: Phaser.Input.Keyboard.KeyCodes.A,
+          right: Phaser.Input.Keyboard.KeyCodes.D,
+          shoot: Phaser.Input.Keyboard.KeyCodes.F
+        });
+
+        // Setup keyboard input for Tank 2 (controlled by Arrow keys and M to shoot)
+        this.keys2 = this.input.keyboard.addKeys({
+          up: Phaser.Input.Keyboard.KeyCodes.UP,
+          down: Phaser.Input.Keyboard.KeyCodes.DOWN,
+          left: Phaser.Input.Keyboard.KeyCodes.LEFT,
+          right: Phaser.Input.Keyboard.KeyCodes.RIGHT,
+          shoot: Phaser.Input.Keyboard.KeyCodes.M
+        });
+
+        // Define Tank 1 (blue tank)
+        this.tank1 = {
+          x: 100,
+          y: config.height / 2 - 15,
+          width: 30,
+          height: 30,
+          speed: 3,
+          color: 0x0000ff,   // Blue
+          turretAngle: 0     // Initially facing right (0 radians)
+        };
+        this.tank1.hp = 6;
+        this.tank1.lastShotTime = 0;
+
+        // Define Tank 2 (red tank)
+        this.tank2 = {
+          x: config.width - 130,
+          y: config.height / 2 - 15,
+          width: 30,
+          height: 30,
+          speed: 3,
+          color: 0xff0000,   // Red
+          turretAngle: Math.PI   // Initially facing left (π radians)
+        };
+        this.tank2.hp = 6;
+        this.tank2.lastShotTime = 0;
+
+        // Flag to track if the game is over
+        this.gameOver = false;
+
+        // Array to hold bullets
+        this.bullets = [];
+      }
+
+      function update() {
+        // If game is over, display winner and a replay button, then stop further updates.
+        if (this.gameOver) {
+            this.graphics.clear();
+            if (!this.gameOverText) {
+                let winner = (this.tank1.hp <= 0) ? "Red Tank Wins!" : "Blue Tank Wins!";
+                this.gameOverText = this.add.text(this.sys.game.config.width/2, this.sys.game.config.height/2 - 50, winner, { fontSize: '64px', fill: '#ffffff' }).setOrigin(0.5);
+            }
+            if (!this.replayButton) {
+                this.replayButton = this.add.text(this.sys.game.config.width/2, this.sys.game.config.height/2 + 50, "Replay", { fontSize: '48px', fill: '#ffffff' }).setOrigin(0.5).setInteractive();
+                this.replayButton.on('pointerdown', () => {
+                    this.scene.restart();
+                });
+            }
+            return;
+        }
+
+        // Clear the graphics for this new frame.
+        this.graphics.clear();
+
+        // --- Tank 1 Controls (WASD movement) ---
+        let dx1 = 0, dy1 = 0;
+        if (this.keys1.up.isDown) {
+          dy1 -= 1;
+          this.tank1.y -= this.tank1.speed;
+        }
+        if (this.keys1.down.isDown) {
+          dy1 += 1;
+          this.tank1.y += this.tank1.speed;
+        }
+        if (this.keys1.left.isDown) {
+          dx1 -= 1;
+          this.tank1.x -= this.tank1.speed;
+        }
+        if (this.keys1.right.isDown) {
+          dx1 += 1;
+          this.tank1.x += this.tank1.speed;
+        }
+        // Update turret angle based on movement direction for Tank 1.
+        if (dx1 !== 0 || dy1 !== 0) {
+           this.tank1.turretAngle = Math.atan2(dy1, dx1);
+        }
+        // Clamp Tank 1 within game bounds
+        this.tank1.x = Phaser.Math.Clamp(this.tank1.x, 0, this.sys.game.config.width - this.tank1.width);
+        this.tank1.y = Phaser.Math.Clamp(this.tank1.y, 0, this.sys.game.config.height - this.tank1.height);
+        // Handle shooting for Tank 1 with 500ms delay
+        if (Phaser.Input.Keyboard.JustDown(this.keys1.shoot) && this.time.now - this.tank1.lastShotTime >= 500) {
+          const turretLength = 20;
+          const centerX = this.tank1.x + this.tank1.width / 2;
+          const centerY = this.tank1.y + this.tank1.height / 2;
+          const bx = centerX + turretLength * Math.cos(this.tank1.turretAngle);
+          const by = centerY + turretLength * Math.sin(this.tank1.turretAngle);
+          this.bullets.push({
+            x: bx,
+            y: by,
+            speed: 5,
+            angle: this.tank1.turretAngle,
+            owner: 'tank1',
+            bounce: 0  // initialize bounce counter
+          });
+          this.tank1.lastShotTime = this.time.now;
+        }
+
+        // --- Tank 2 Controls (Arrow keys movement) ---
+        let dx2 = 0, dy2 = 0;
+        if (this.keys2.up.isDown) {
+          dy2 -= 1;
+          this.tank2.y -= this.tank2.speed;
+        }
+        if (this.keys2.down.isDown) {
+          dy2 += 1;
+          this.tank2.y += this.tank2.speed;
+        }
+        if (this.keys2.left.isDown) {
+          dx2 -= 1;
+          this.tank2.x -= this.tank2.speed;
+        }
+        if (this.keys2.right.isDown) {
+          dx2 += 1;
+          this.tank2.x += this.tank2.speed;
+        }
+        // Update turret angle based on movement direction for Tank 2.
+        if (dx2 !== 0 || dy2 !== 0) {
+           this.tank2.turretAngle = Math.atan2(dy2, dx2);
+        }
+        // Clamp Tank 2 within game bounds
+        this.tank2.x = Phaser.Math.Clamp(this.tank2.x, 0, this.sys.game.config.width - this.tank2.width);
+        this.tank2.y = Phaser.Math.Clamp(this.tank2.y, 0, this.sys.game.config.height - this.tank2.height);
+        // Handle shooting for Tank 2 with 500ms delay
+        if (Phaser.Input.Keyboard.JustDown(this.keys2.shoot) && this.time.now - this.tank2.lastShotTime >= 500) {
+          const turretLength = 20;
+          const centerX = this.tank2.x + this.tank2.width / 2;
+          const centerY = this.tank2.y + this.tank2.height / 2;
+          const bx = centerX + turretLength * Math.cos(this.tank2.turretAngle);
+          const by = centerY + turretLength * Math.sin(this.tank2.turretAngle);
+          this.bullets.push({
+            x: bx,
+            y: by,
+            speed: 5,
+            angle: this.tank2.turretAngle,
+            owner: 'tank2',
+            bounce: 0  // initialize bounce counter
+          });
+          this.tank2.lastShotTime = this.time.now;
+        }
+
+        // --- Update bullets with collision detection ---
+        for (let i = this.bullets.length - 1; i >= 0; i--) {
+          let bullet = this.bullets[i];
+          bullet.x += bullet.speed * Math.cos(bullet.angle);
+          bullet.y += bullet.speed * Math.sin(bullet.angle);
+
+          // Check collision with the opposing tank:
+          if (bullet.owner === 'tank1') {
+              if (bullet.x >= this.tank2.x && bullet.x <= this.tank2.x + this.tank2.width &&
+                  bullet.y >= this.tank2.y && bullet.y <= this.tank2.y + this.tank2.height) {
+                  this.tank2.hp--;
+                  this.bullets.splice(i, 1);
+                  continue;
+              }
+          } else if (bullet.owner === 'tank2') {
+              if (bullet.x >= this.tank1.x && bullet.x <= this.tank1.x + this.tank1.width &&
+                  bullet.y >= this.tank1.y && bullet.y <= this.tank1.y + this.tank1.height) {
+                  this.tank1.hp--;
+                  this.bullets.splice(i, 1);
+                  continue;
+              }
+          }
+
+          // Bounce logic for wall collisions:
+          let gameWidth = this.sys.game.config.width;
+          let gameHeight = this.sys.game.config.height;
+
+          // Horizontal wall collision:
+          if (bullet.x < 0) {
+              if (bullet.bounce >= 2) {
+                  this.bullets.splice(i, 1);
+                  continue;
+              } else {
+                  bullet.x = 0;
+                  bullet.angle = Math.PI - bullet.angle;
+                  bullet.bounce++;
+              }
+          } else if (bullet.x > gameWidth) {
+              if (bullet.bounce >= 2) {
+                  this.bullets.splice(i, 1);
+                  continue;
+              } else {
+                  bullet.x = gameWidth;
+                  bullet.angle = Math.PI - bullet.angle;
+                  bullet.bounce++;
+              }
+          }
+
+          // Vertical wall collision:
+          if (bullet.y < 0) {
+              if (bullet.bounce >= 2) {
+                  this.bullets.splice(i, 1);
+                  continue;
+              } else {
+                  bullet.y = 0;
+                  bullet.angle = -bullet.angle;
+                  bullet.bounce++;
+              }
+          } else if (bullet.y > gameHeight) {
+              if (bullet.bounce >= 2) {
+                  this.bullets.splice(i, 1);
+                  continue;
+              } else {
+                  bullet.y = gameHeight;
+                  bullet.angle = -bullet.angle;
+                  bullet.bounce++;
+              }
+          }
+        }
+
+        // Check if a tank has lost all HP
+        if (this.tank1.hp <= 0 || this.tank2.hp <= 0) {
+            this.gameOver = true;
+        }
+
+        // --- Drawing Section ---
+        // Draw tanks and their health bars
+        drawTank(this.graphics, this.tank1);
+        drawHealthBar(this.graphics, this.tank1);
+        drawTank(this.graphics, this.tank2);
+        drawHealthBar(this.graphics, this.tank2);
+
+        // Draw bullets as circles
+        this.graphics.fillStyle(0xffffff, 1);
+        this.bullets.forEach(bullet => {
+          this.graphics.fillCircle(bullet.x, bullet.y, 5);
+        });
+      }
+
+      // Helper function to draw a tank body and its turret.
+      function drawTank(graphics, tank) {
+        // Draw tank body
+        graphics.fillStyle(tank.color, 1);
+        graphics.fillRect(tank.x, tank.y, tank.width, tank.height);
+        
+        // Draw turret as a line originating from the tank's center
+        const centerX = tank.x + tank.width / 2;
+        const centerY = tank.y + tank.height / 2;
+        const turretLength = 20;
+        const tipX = centerX + turretLength * Math.cos(tank.turretAngle);
+        const tipY = centerY + turretLength * Math.sin(tank.turretAngle);
+        
+        graphics.lineStyle(2, 0xffffff, 1);
+        graphics.strokeLineShape(new Phaser.Geom.Line(centerX, centerY, tipX, tipY));
+      }
+
+      // Helper function to draw a health bar above a tank
+      function drawHealthBar(graphics, tank) {
+          const barWidth = tank.width;
+          const barHeight = 5;
+          const x = tank.x;
+          const y = tank.y - barHeight - 10;
+          // Draw black background (health bar border)
+          graphics.fillStyle(0xffffff, 1);
+          graphics.fillRect(x, y, barWidth, barHeight);
+          // Draw green health proportional to remaining HP (6 HP max)
+          let hpRatio = tank.hp / 6;
+          graphics.fillStyle(0x00ff00, 1);
+          graphics.fillRect(x, y, barWidth * hpRatio, barHeight);
+      }
+    };
+  </script>
+</head>
+<body>
+</body>
+</html> 
