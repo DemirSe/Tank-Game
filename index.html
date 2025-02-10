@@ -41,8 +41,17 @@
       }
 
       function create() {
+        // Get the scores from the previous round if they exist
+        const scores = this.scene.settings.data;
+        
         // Create a graphics object for drawing our tanks and bullets.
         this.graphics = this.add.graphics();
+
+        // Reset game over related properties
+        this.gameOver = false;
+        this.gameOverText = null;
+        this.roundScoreText = null;
+        this.replayButton = null;
 
         // Setup keyboard input for Tank 1 (controlled by WASD and F to shoot)
         this.keys1 = this.input.keyboard.addKeys({
@@ -70,7 +79,8 @@
           height: 30,
           speed: 3,
           color: 0x0000ff,   // Blue
-          turretAngle: 0     // Initially facing right (0 radians)
+          turretAngle: 0,    // Initially facing right (0 radians)
+          score: 0           // Add score property
         };
         this.tank1.hp = 6;
         this.tank1.lastShotTime = 0;
@@ -83,13 +93,24 @@
           height: 30,
           speed: 3,
           color: 0xff0000,   // Red
-          turretAngle: Math.PI   // Initially facing left (π radians)
+          turretAngle: Math.PI,   // Initially facing left (π radians)
+          score: 0           // Add score property
         };
         this.tank2.hp = 6;
         this.tank2.lastShotTime = 0;
 
-        // Flag to track if the game is over
-        this.gameOver = false;
+        // Create score text displays
+        this.scoreText1 = this.add.text(20, 20, 'Blue: 0', { fontSize: '32px', fill: '#0000FF', stroke: '#000000', strokeThickness: 4 });
+        this.scoreText2 = this.add.text(config.width - 150, 20, 'Red: 0', { fontSize: '32px', fill: '#FF0000', stroke: '#000000', strokeThickness: 4 });
+
+        // If we have previous scores, apply them
+        if (scores) {
+            this.tank1.score = scores.tank1Score || 0;
+            this.tank2.score = scores.tank2Score || 0;
+            // Update score displays
+            this.scoreText1.setText(`Blue: ${this.tank1.score}`);
+            this.scoreText2.setText(`Red: ${this.tank2.score}`);
+        }
 
         // Array to hold bullets
         this.bullets = [];
@@ -101,13 +122,43 @@
             this.graphics.clear();
             if (!this.gameOverText) {
                 let winner = (this.tank1.hp <= 0) ? "Red Tank Wins!" : "Blue Tank Wins!";
-                let winnerColor = (this.tank1.hp <= 0) ? '#FF0000' : '#0000FF'; // Red for Tank 2 (red), Blue for Tank 1 (blue)
-                this.gameOverText = this.add.text(this.sys.game.config.width/2, this.sys.game.config.height/2 - 50, winner, { fontSize: '96px', fill: winnerColor, stroke: '#000000', strokeThickness: 4 }).setOrigin(0.5);
+                let winnerColor = (this.tank1.hp <= 0) ? '#FF0000' : '#0000FF';
+                this.gameOverText = this.add.text(this.sys.game.config.width/2, this.sys.game.config.height/2 - 50, winner, 
+                    { fontSize: '96px', fill: winnerColor, stroke: '#000000', strokeThickness: 4 })
+                    .setOrigin(0.5)
+                    .setDepth(1);  // Ensure it's drawn on top
+                
+                // Add round score text
+                let roundScore = (this.tank1.hp <= 0) ? 
+                    `Blue: ${this.tank1.score} - Red: ${this.tank2.score}` :
+                    `Blue: ${this.tank1.score} - Red: ${this.tank2.score}`;
+                this.roundScoreText = this.add.text(this.sys.game.config.width/2, this.sys.game.config.height/2 + 20, roundScore, 
+                    { fontSize: '48px', fill: '#FFFFFF', stroke: '#000000', strokeThickness: 4 })
+                    .setOrigin(0.5)
+                    .setDepth(1);  // Ensure it's drawn on top
             }
             if (!this.replayButton) {
-                this.replayButton = this.add.text(this.sys.game.config.width/2, this.sys.game.config.height/2 + 100, "Replay", { fontSize: '64px', fill: '#FFFFFF', backgroundColor: '#4CAF50', padding: { x: 20, y: 10 } }).setOrigin(0.5).setInteractive();
+                this.replayButton = this.add.text(this.sys.game.config.width/2, this.sys.game.config.height/2 + 100, "Play Again", 
+                    { fontSize: '64px', fill: '#FFFFFF', backgroundColor: '#4CAF50', padding: { x: 20, y: 10 } })
+                    .setOrigin(0.5)
+                    .setInteractive()
+                    .setDepth(1);  // Ensure it's drawn on top
+                
+                // Modify the replay button to preserve scores
                 this.replayButton.on('pointerdown', () => {
-                    this.scene.restart();
+                    // Store the scores
+                    const scores = {
+                        tank1Score: this.tank1.score,
+                        tank2Score: this.tank2.score
+                    };
+                    
+                    // Destroy all game over elements before restarting
+                    if (this.gameOverText) this.gameOverText.destroy();
+                    if (this.roundScoreText) this.roundScoreText.destroy();
+                    if (this.replayButton) this.replayButton.destroy();
+                    
+                    // Restart the scene with the scores
+                    this.scene.restart(scores);
                 });
             }
             return;
@@ -305,6 +356,15 @@
 
         // Check if a tank has lost all HP
         if (this.tank1.hp <= 0 || this.tank2.hp <= 0) {
+            // Update scores before game over
+            if (this.tank1.hp <= 0) {
+                this.tank2.score += 1;
+            } else {
+                this.tank1.score += 1;
+            }
+            // Update score displays
+            this.scoreText1.setText(`Blue: ${this.tank1.score}`);
+            this.scoreText2.setText(`Red: ${this.tank2.score}`);
             this.gameOver = true;
         }
 
