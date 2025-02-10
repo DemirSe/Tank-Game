@@ -18,35 +18,38 @@
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js"></script>
   <script>
     window.onload = function() {
-      const config = {
-        type: Phaser.AUTO,
-        width: 1920,       // Virtual width (16:9)
-        height: 1080,      // Virtual height
-        backgroundColor: "#222222",
-        scale: {
-          mode: Phaser.Scale.FIT,           // FIT mode scales the game for any 16:9 screen
-          autoCenter: Phaser.Scale.CENTER_BOTH
-        },
-        scene: {
-          preload: preload,
-          create: create,
-          update: update
-        }
-      };
-
-      const game = new Phaser.Game(config);
+      document.getElementById("start-button").addEventListener("click", function() {
+        console.log("Start button clicked. Starting game...");
+        document.getElementById("start-screen").style.display = "none";
+        const config = {
+          type: Phaser.AUTO,
+          width: 1920,       // Virtual width (16:9)
+          height: 1080,      // Virtual height
+          backgroundColor: "#222222",
+          scale: {
+            mode: Phaser.Scale.FIT,           // FIT mode scales the game for any 16:9 screen
+            autoCenter: Phaser.Scale.CENTER_BOTH
+          },
+          scene: {
+            preload: preload,
+            create: create,
+            update: update
+          }
+        };
+        const game = new Phaser.Game(config);
+      });
 
       function preload() {
         // No external assets are required; we're using graphics objects.
       }
 
       function create() {
+        console.log("Scene create() invoked");
         // Get the scores from the previous round if they exist
         const scores = this.scene.settings.data;
         
         // Create a graphics object for drawing our tanks and bullets.
         this.graphics = this.add.graphics();
-
         // Reset game over related properties
         this.gameOver = false;
         this.gameOverText = null;
@@ -74,7 +77,7 @@
         // Define Tank 1 (blue tank)
         this.tank1 = {
           x: 100,
-          y: config.height / 2 - 15,
+          y: this.sys.game.config.height / 2 - 15,
           width: 30,
           height: 30,
           speed: 3,
@@ -88,8 +91,8 @@
 
         // Define Tank 2 (red tank)
         this.tank2 = {
-          x: config.width - 130,
-          y: config.height / 2 - 15,
+          x: this.sys.game.config.width - 130,
+          y: this.sys.game.config.height / 2 - 15,
           width: 30,
           height: 30,
           speed: 3,
@@ -120,7 +123,7 @@
 
         // Create score text displays
         this.scoreText1 = this.add.text(20, 20, 'Blue: 0', { fontSize: '32px', fill: '#0000FF', stroke: '#000000', strokeThickness: 4 });
-        this.scoreText2 = this.add.text(config.width - 150, 20, 'Red: 0', { fontSize: '32px', fill: '#FF0000', stroke: '#000000', strokeThickness: 4 });
+        this.scoreText2 = this.add.text(this.sys.game.config.width - 150, 20, 'Red: 0', { fontSize: '32px', fill: '#FF0000', stroke: '#000000', strokeThickness: 4 });
 
         // If we have previous scores, apply them
         if (scores) {
@@ -533,5 +536,12 @@
   </script>
 </head>
 <body>
+  <div id="start-screen" style="width:100vw; height:100vh; background:#121212; display:flex; flex-direction:column; justify-content:center; align-items:center; position:absolute; top:0; left:0; z-index:9999;">
+    <button id="start-button" style="padding:20px 40px; font-size:24px; cursor:pointer; margin-bottom:40px;">Start Game</button>
+    <div style="background: rgba(255, 255, 255, 0.1); padding:20px 30px; border-radius:8px; color:white; font-size:20px; text-align:center;">
+      <p><strong>Blue Tank</strong>: Use W, A, S, D to move, F to shoot.</p>
+      <p><strong>Red Tank</strong>: Use Arrow keys to move, M to shoot.</p>
+    </div>
+  </div>
 </body>
 </html> 
