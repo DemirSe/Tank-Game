@@ -101,10 +101,11 @@
             this.graphics.clear();
             if (!this.gameOverText) {
                 let winner = (this.tank1.hp <= 0) ? "Red Tank Wins!" : "Blue Tank Wins!";
-                this.gameOverText = this.add.text(this.sys.game.config.width/2, this.sys.game.config.height/2 - 50, winner, { fontSize: '64px', fill: '#ffffff' }).setOrigin(0.5);
+                let winnerColor = (this.tank1.hp <= 0) ? '#FF0000' : '#0000FF'; // Red for Tank 2 (red), Blue for Tank 1 (blue)
+                this.gameOverText = this.add.text(this.sys.game.config.width/2, this.sys.game.config.height/2 - 50, winner, { fontSize: '96px', fill: winnerColor, stroke: '#000000', strokeThickness: 4 }).setOrigin(0.5);
             }
             if (!this.replayButton) {
-                this.replayButton = this.add.text(this.sys.game.config.width/2, this.sys.game.config.height/2 + 50, "Replay", { fontSize: '48px', fill: '#ffffff' }).setOrigin(0.5).setInteractive();
+                this.replayButton = this.add.text(this.sys.game.config.width/2, this.sys.game.config.height/2 + 100, "Replay", { fontSize: '64px', fill: '#FFFFFF', backgroundColor: '#4CAF50', padding: { x: 20, y: 10 } }).setOrigin(0.5).setInteractive();
                 this.replayButton.on('pointerdown', () => {
                     this.scene.restart();
                 });
@@ -199,6 +200,37 @@
             bounce: 0  // initialize bounce counter
           });
           this.tank2.lastShotTime = this.time.now;
+        }
+
+        // --- Collision detection between tanks: prevent overlap (executed every update) ---
+        let dx = (this.tank1.x + this.tank1.width/2) - (this.tank2.x + this.tank2.width/2);
+        let dy = (this.tank1.y + this.tank1.height/2) - (this.tank2.y + this.tank2.height/2);
+        let combinedHalfWidths = (this.tank1.width + this.tank2.width) / 2;
+        let combinedHalfHeights = (this.tank1.height + this.tank2.height) / 2;
+        if (Math.abs(dx) < combinedHalfWidths && Math.abs(dy) < combinedHalfHeights) {
+          let overlapX = combinedHalfWidths - Math.abs(dx);
+          let overlapY = combinedHalfHeights - Math.abs(dy);
+          if (overlapX < overlapY) {
+            if (dx > 0) {
+              this.tank1.x += overlapX / 2;
+              this.tank2.x -= overlapX / 2;
+            } else {
+              this.tank1.x -= overlapX / 2;
+              this.tank2.x += overlapX / 2;
+            }
+          } else {
+            if (dy > 0) {
+              this.tank1.y += overlapY / 2;
+              this.tank2.y -= overlapY / 2;
+            } else {
+              this.tank1.y -= overlapY / 2;
+              this.tank2.y += overlapY / 2;
+            }
+          }
+          this.tank1.x = Phaser.Math.Clamp(this.tank1.x, 0, this.sys.game.config.width - this.tank1.width);
+          this.tank1.y = Phaser.Math.Clamp(this.tank1.y, 0, this.sys.game.config.height - this.tank1.height);
+          this.tank2.x = Phaser.Math.Clamp(this.tank2.x, 0, this.sys.game.config.width - this.tank2.width);
+          this.tank2.y = Phaser.Math.Clamp(this.tank2.y, 0, this.sys.game.config.height - this.tank2.height);
         }
 
         // --- Update bullets with collision detection ---
