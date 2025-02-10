@@ -121,6 +121,15 @@
         // Removed the immediate spawn to delay first spawn by 15 seconds
         // this.spawnPowerUp();
 
+        // Insert the following lines immediately after the above block:
+        this.spawnHealthRestore = spawnHealthRestore;
+        this.time.addEvent({
+          delay: 30000,  // 30 seconds
+          callback: this.spawnHealthRestore,
+          callbackScope: this,
+          loop: true
+        });
+
         // Create score text displays
         this.scoreText1 = this.add.text(20, 20, 'Blue: 0', { fontSize: '32px', fill: '#0000FF', stroke: '#000000', strokeThickness: 4 });
         this.scoreText2 = this.add.text(this.sys.game.config.width - 150, 20, 'Red: 0', { fontSize: '32px', fill: '#FF0000', stroke: '#000000', strokeThickness: 4 });
@@ -152,6 +161,20 @@
         });
       }
 
+      function spawnHealthRestore() {
+        // Spawn health restore item at random position
+        const x = Phaser.Math.Between(50, this.sys.game.config.width - 50);
+        const y = Phaser.Math.Between(50, this.sys.game.config.height - 50);
+        
+        this.powerUps.push({
+          x: x,
+          y: y,
+          width: 20,
+          height: 20,
+          type: 'heart'
+        });
+      }
+
       function drawPowerUp(graphics, powerUp) {
         const centerX = powerUp.x;
         const centerY = powerUp.y;
@@ -177,6 +200,19 @@
         graphics.fillStyle(0xffff00);
         graphics.lineStyle(2, 0xffff00);
         graphics.fillPoints(points, true);
+      }
+
+      function drawHeart(graphics, powerUp) {
+        const centerX = powerUp.x;
+        const centerY = powerUp.y;
+        const size = powerUp.width / 2;
+        graphics.fillStyle(0xff0000, 1);
+        // Draw left circle
+        graphics.fillCircle(centerX - size/2, centerY - size/2, size/2);
+        // Draw right circle
+        graphics.fillCircle(centerX + size/2, centerY - size/2, size/2);
+        // Draw bottom triangle
+        graphics.fillTriangle(centerX - size, centerY - size/2, centerX + size, centerY - size/2, centerX, centerY + size);
       }
 
       function fireBurstShot(tank) {
@@ -483,7 +519,12 @@
         // Draw and check power-up collisions
         for (let i = this.powerUps.length - 1; i >= 0; i--) {
           const powerUp = this.powerUps[i];
-          drawPowerUp(this.graphics, powerUp);
+          // Draw power-up based on its type
+          if (powerUp.type === 'heart') {
+            drawHeart(this.graphics, powerUp);
+          } else {
+            drawPowerUp(this.graphics, powerUp);
+          }
           
           // Check collision with tanks
           const checkTankCollision = (tank) => {
@@ -492,10 +533,18 @@
           };
           
           if (checkTankCollision(this.tank1)) {
-            this.tank1.hasBurstShot = true;
+            if (powerUp.type === 'heart') {
+              this.tank1.hp = Math.min(6, this.tank1.hp + 1);
+            } else {
+              this.tank1.hasBurstShot = true;
+            }
             this.powerUps.splice(i, 1);
           } else if (checkTankCollision(this.tank2)) {
-            this.tank2.hasBurstShot = true;
+            if (powerUp.type === 'heart') {
+              this.tank2.hp = Math.min(6, this.tank2.hp + 1);
+            } else {
+              this.tank2.hasBurstShot = true;
+            }
             this.powerUps.splice(i, 1);
           }
         }
